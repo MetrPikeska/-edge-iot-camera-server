@@ -257,23 +257,7 @@ def get_snapshot():
     """
     snapshot_path = os.path.join(config.IMAGES_DIR, config.LATEST_IMAGE_NAME)
     
-    # 
-
-
-@app.route('/video_feed')
-def video_feed():
-    """
-    Video streaming route. Returns Motion JPEG stream.
-    
-    Returns:
-        Response with multipart/x-mixed-replace content type
-    """
-    logger.info("Video feed request received")
-    
-    return Response(
-        camera.generate_frames(),
-        mimetype='multipart/x-mixed-replace; boundary=frame'
-    )Check if snapshot exists
+    # Check if snapshot exists
     if not os.path.exists(snapshot_path):
         logger.warning("Snapshot not found, capturing new image...")
         success, _ = capture_snapshot()
@@ -293,6 +277,22 @@ def video_feed():
     except Exception as e:
         logger.error(f"Error serving snapshot: {e}")
         return jsonify({"error": str(e)}), 500
+
+
+@app.route('/video_feed')
+def video_feed():
+    """
+    Video streaming route. Returns Motion JPEG stream.
+    
+    Returns:
+        Response with multipart/x-mixed-replace content type
+    """
+    logger.info("Video feed request received")
+    
+    return Response(
+        camera.generate_frames(),
+        mimetype='multipart/x-mixed-replace; boundary=frame'
+    )
 
 
 @app.route('/capture')
