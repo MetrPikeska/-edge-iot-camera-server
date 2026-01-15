@@ -63,7 +63,7 @@ echo ""
 # Krok 5: Instalace Python balíčků
 echo -e "${YELLOW}[5/6] Instalace Python balíčků...${NC}"
 source venv/bin/activate
-pip install --upgrade pip
+pip install --upgrade pip setuptools wheel
 pip install -r requirements.txt
 echo -e "${GREEN}✓ Python balíčky nainstalovány${NC}"
 echo ""
