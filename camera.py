@@ -138,19 +138,19 @@ class CameraCapture:
                 timestamp = datetime.now().strftime(config.TIMESTAMP_FORMAT)
                 timestamped_filename = f"snapshot_{timestamp}.jpg"
                 timestamped_path = os.path.join(config.IMAGES_DIR, timestamped_filename)
-            except Exception as e:
-                logger.error(f"Error during image capture: {e}")
-                return False, None
-                
-            finally:
-                # Always release camera
-                self._close_camera()
-                logger.debug("Camera lock released"r during image capture: {e}")
+                cv2.imwrite(timestamped_path, frame, [cv2.IMWRITE_JPEG_QUALITY, 95])
+                logger.info(f"Timestamped snapshot saved: {timestamped_path}")
+            
+            return True, latest_path
+            
+        except Exception as e:
+            logger.error(f"Error during image capture: {e}")
             return False, None
             
         finally:
             # Always release camera
             self._close_camera()
+            logger.debug("Camera lock released")
     
     def test_camera(self) -> bool:
         """
