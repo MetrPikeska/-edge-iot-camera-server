@@ -6,7 +6,7 @@ import cv2
 import os
 import logging
 from datetime import datetime
-from typing import Optional, Tuple
+from typing import Optional, Tuple, Generator
 import config
 
 # Setup logging
@@ -171,6 +171,59 @@ class CameraCapture:
             
         finally:
             self._close_camera()
+    
+    def generate_frames(self) -> Generator[bytes, None, None]:
+        """
+        Generate video frames for streaming.
+        Yields JPEG encoded frames in Motion JPEG format.
+        
+        Yields:
+            JPEG encoded frame bytes
+        """
+        # Open camera for streaming
+        if not self._open_camera():
+            logger.error("Failed to open camera for streaming")
+            return
+        
+        try:
+            logger.info("Starting video stream...")
+            frame_count = 0
+            
+            # Warmup
+            for _ in range(5):
+                self.camera.read()
+            
+            while True:
+                ret, frame = self.camera.read()
+                
+                if not ret or frame is None:
+                    logger.warning("Failed to read frame from camera")
+                    break
+                
+                # Encode frame as JPEG
+                ret, buffer = cv2.imencode('.jpg', frame, [cv2.IMWRITE_JPEG_QUALITY, 85])
+                
+                if not ret:
+                    logger.warning("Failed to encode frame")
+                    continue
+                
+                frame_bytes = buffer.tobytes()
+                
+                # Yield frame in multipart format
+                yield (b'--frame\r\n'
+                       b'Content-Type: image/jpeg\r\n\r\n' + frame_bytes + b'\r\n')
+                
+                frame_count += 1
+                if frame_count % 100 == 0:
+                    logger.debug(f"Streamed {frame_count} frames")
+                    
+        except GeneratorExit:
+            logger.info("Video stream stopped by client")
+        except Exception as e:
+            logger.error(f"Error during video streaming: {e}")
+        finally:
+            self._close_camera()
+            logger.info(f"Video stream ended. Total frames: {frame_count}")
 
 
 def capture_snapshot() -> Tuple[bool, Optional[str]]:
