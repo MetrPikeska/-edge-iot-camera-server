@@ -38,7 +38,7 @@ Lehký Python server pro zachycování a poskytování snímků z USB kamery. Na
 
 **Výchozí umístění:**
 - Všechny snímky se ukládají do složky `images/` v kořenovém adresáři projektu
-- Cesta: `/home/metr/-edge-iot-camera-server/images/`
+- Cesta: `/home/metr/edge-iot-camera-server/images/`
 
 **Aktuální soubory:**
 - `snapshot.jpg` - Nejaktuálnější snímek (přepisuje se při každém zachycení)
@@ -70,8 +70,8 @@ Lehký Python server pro zachycování a poskytování snímků z USB kamery. Na
 ### 1. Clone the Repository
 
 ```bash
-git clone https://github.com/MetrPikeska/-edge-iot-camera-server.git
-cd -edge-iot-camera-server
+git clone https://github.com/MetrPikeska/edge-iot-camera-server.git
+cd edge-iot-camera-server
 ```
 
 ### 2. Install Dependencies
@@ -144,7 +144,7 @@ ip addr show
 ## 📁 Project Structure
 
 ```
--edge-iot-camera-server/
+edge-iot-camera-server/
 ├── app.py                 # Flask web server (hlavní aplikace)
 ├── camera.py              # Modul pro práci s kamerou (OpenCV + threading)
 ├── config.py              # Konfigurační nastavení
@@ -199,7 +199,7 @@ Spustí nové zachycení snímku z kamery (uloží jako `snapshot.jpg`).
   "success": true,
   "message": "Image captured successfully",
   "timestamp": "2026-01-15T10:30:00",
-  "filepath": "/home/metr/-edge-iot-camera-server/images/snapshot.jpg"
+  "filepath": "/home/metr/edge-iot-camera-server/images/snapshot.jpg"
 }
 ```
 
