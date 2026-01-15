@@ -4,9 +4,9 @@ Configuration settings for the edge IoT camera server.
 import os
 
 # Camera settings
-CAMERA_INDEX = 0  # /dev/video0 on Linux
-CAMERA_WIDTH = 1920
-CAMERA_HEIGHT = 1080
+CAMERA_INDEX = 2  # /dev/video2 = J1455 USB camera (not built-in HP camera)
+CAMERA_WIDTH = 640
+CAMERA_HEIGHT = 480
 CAMERA_FPS = 30
 
 # Image storage settings
