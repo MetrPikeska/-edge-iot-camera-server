@@ -7,6 +7,7 @@ import os
 import logging
 from datetime import datetime
 from typing import Optional, Tuple, Generator
+import threading
 import config
 
 # Setup logging
@@ -15,6 +16,9 @@ logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
 logger = logging.getLogger(__name__)
+
+# Global lock for camera access (only one thread can use camera at a time)
+camera_lock = threading.Lock()
 
 
 class CameraCapture:
@@ -86,6 +90,7 @@ class CameraCapture:
     def capture_image(self, save_with_timestamp: bool = True) -> Tuple[bool, Optional[str]]:
         """
         Capture a single frame from the camera and save it to disk.
+        Thread-safe: uses lock to prevent concurrent camera access.
         
         Args:
             save_with_timestamp: If True, saves both timestamped and latest versions
@@ -93,9 +98,13 @@ class CameraCapture:
         Returns:
             Tuple of (success: bool, filepath: Optional[str])
         """
-        # Open camera
-        if not self._open_camera():
-            return False, None
+        # Acquire lock to ensure exclusive camera access
+        with camera_lock:
+            logger.debug("Camera lock acquired for capture")
+            
+            # Open camera
+            if not self._open_camera():
+                return False, None
         
         try:
             # Allow camera to warm up (important for USB cameras)
@@ -129,13 +138,14 @@ class CameraCapture:
                 timestamp = datetime.now().strftime(config.TIMESTAMP_FORMAT)
                 timestamped_filename = f"snapshot_{timestamp}.jpg"
                 timestamped_path = os.path.join(config.IMAGES_DIR, timestamped_filename)
-                cv2.imwrite(timestamped_path, frame, [cv2.IMWRITE_JPEG_QUALITY, 95])
-                logger.info(f"Timestamped snapshot saved: {timestamped_path}")
-            
-            return True, latest_path
-            
-        except Exception as e:
-            logger.error(f"Error during image capture: {e}")
+            except Exception as e:
+                logger.error(f"Error during image capture: {e}")
+                return False, None
+                
+            finally:
+                # Always release camera
+                self._close_camera()
+                logger.debug("Camera lock released"r during image capture: {e}")
             return False, None
             
         finally:
@@ -144,72 +154,77 @@ class CameraCapture:
     
     def test_camera(self) -> bool:
         """
-        Test if camera is accessible and working.
+        Thread-safe: uses lock to prevent concurrent camera access.
         
         Returns:
             True if camera test successful, False otherwise
         """
-        logger.info("Testing camera connection...")
-        
-        if not self._open_camera():
-            return False
-        
-        try:
-            ret, frame = self.camera.read()
-            success = ret and frame is not None
+        with camera_lock:
+            logger.info("Testing camera connection...")
             
-            if success:
-                logger.info("✓ Camera test successful")
-            else:
-                logger.error("✗ Camera test failed - unable to read frame")
+            if not self._open_camera():
+                return False
             
-            return success
-            
-        except Exception as e:
-            logger.error(f"✗ Camera test failed: {e}")
-            return False
-            
-        finally:
+            try:
+                ret, frame = self.camera.read()
+                success = ret and frame is not None
+                
+                if success:
+                    logger.info("✓ Camera test successful")
+                else:
+                    logger.error("✗ Camera test failed - unable to read frame")
+                
+                return success
+                
+            except Exception as e:
+                logger.error(f"✗ Camera test failed: {e}")
+                return False
+                
+            finally:
+            finally:
             self._close_camera()
     
     def generate_frames(self) -> Generator[bytes, None, None]:
-        """
-        Generate video frames for streaming.
-        Yields JPEG encoded frames in Motion JPEG format.
+        Thread-safe: uses lock for each frame to allow capture during streaming.
         
         Yields:
             JPEG encoded frame bytes
         """
-        # Open camera for streaming
-        if not self._open_camera():
-            logger.error("Failed to open camera for streaming")
-            return
+        logger.info("Starting video stream...")
+        frame_count = 0
         
         try:
-            logger.info("Starting video stream...")
-            frame_count = 0
-            
-            # Warmup
-            for _ in range(5):
-                self.camera.read()
-            
             while True:
-                ret, frame = self.camera.read()
+                # Acquire lock for each frame (allows other operations between frames)
+                with camera_lock:
+                    # Open camera if not open
+                    if self.camera is None or not self.camera.isOpened():
+                        if not self._open_camera():
+                            logger.error("Failed to open camera for streaming")
+                            break
+                        # Warmup only on first open
+                        if frame_count == 0:
+                            for _ in range(5):
+                                self.camera.read()
+                    
+                    # Read frame
+                    ret, frame = self.camera.read()
+                    
+                    if not ret or frame is None:
+                        logger.warning("Failed to read frame from camera")
+                        self._close_camera()
+                        continue
+                    
+                    # Encode frame as JPEG
+                    ret, buffer = cv2.imencode('.jpg', frame, [cv2.IMWRITE_JPEG_QUALITY, 85])
+                    
+                    if not ret:
+                        logger.warning("Failed to encode frame")
+                        continue
+                    
+                    frame_bytes = buffer.tobytes()
                 
-                if not ret or frame is None:
-                    logger.warning("Failed to read frame from camera")
-                    break
-                
-                # Encode frame as JPEG
-                ret, buffer = cv2.imencode('.jpg', frame, [cv2.IMWRITE_JPEG_QUALITY, 85])
-                
-                if not ret:
-                    logger.warning("Failed to encode frame")
-                    continue
-                
-                frame_bytes = buffer.tobytes()
-                
-                # Yield frame in multipart format
+                # Yield frame outside of lock (allows other threads to access camera)
                 yield (b'--frame\r\n'
                        b'Content-Type: image/jpeg\r\n\r\n' + frame_bytes + b'\r\n')
                 
@@ -220,6 +235,10 @@ class CameraCapture:
         except GeneratorExit:
             logger.info("Video stream stopped by client")
         except Exception as e:
+            logger.error(f"Error during video streaming: {e}")
+        finally:
+            with camera_lock:
+            except Exception as e:
             logger.error(f"Error during video streaming: {e}")
         finally:
             self._close_camera()
