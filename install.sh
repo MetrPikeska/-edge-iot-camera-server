@@ -39,9 +39,10 @@ sudo apt install -y \
     python3 \
     python3-pip \
     python3-venv \
-    libgl1-mesa-glx \
+    libgl1 \
     libglib2.0-0 \
-    v4l-utils
+    v4l-utils \
+    libgomp1
 echo -e "${GREEN}✓ Hotovo${NC}"
 echo ""
 
