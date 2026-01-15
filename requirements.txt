@@ -1,0 +1,14 @@
+# Edge IoT Camera Server Dependencies
+# Install with: pip install -r requirements.txt
+
+# Core dependencies
+Flask==3.0.0
+opencv-python-headless==4.8.1.78
+numpy==1.24.3
+
+# Optional: For future MQTT integration
+# paho-mqtt==1.6.1
+
+# Optional: For production deployment
+# gunicorn==21.2.0
+# python-dotenv==1.0.0
