@@ -8,6 +8,7 @@ import logging
 from datetime import datetime
 from typing import Optional, Tuple, Generator
 import threading
+import time
 import config
 
 # Setup logging
@@ -25,6 +26,7 @@ class CameraCapture:
     """
     Handles USB camera operations for capturing images.
     Uses OpenCV (cv2) with headless backend suitable for Ubuntu Server.
+    Thread-safe with automatic locking.
     """
     
     def __init__(self, camera_index: int = config.CAMERA_INDEX):
@@ -105,55 +107,55 @@ class CameraCapture:
             # Open camera
             if not self._open_camera():
                 return False, None
-        
-        try:
-            # Allow camera to warm up (important for USB cameras)
-            # Some cameras need more warm-up time
-            logger.info("Warming up camera...")
-            for i in range(10):
-                ret, _ = self.camera.read()
-                if i % 3 == 0:
-                    logger.debug(f"Warmup frame {i+1}/10")
             
-            # Small delay for camera stabilization
-            import time
-            time.sleep(0.5)
-            
-            # Capture frame
-            ret, frame = self.camera.read()
-            
-            if not ret or frame is None:
-                logger.error("Failed to capture frame from camera")
+            try:
+                # Allow camera to warm up (important for USB cameras)
+                # Some cameras need more warm-up time
+                logger.info("Warming up camera...")
+                for i in range(10):
+                    ret, _ = self.camera.read()
+                    if i % 3 == 0:
+                        logger.debug(f"Warmup frame {i+1}/10")
+                
+                # Small delay for camera stabilization
+                time.sleep(0.5)
+                
+                # Capture frame
+                ret, frame = self.camera.read()
+                
+                if not ret or frame is None:
+                    logger.error("Failed to capture frame from camera")
+                    return False, None
+                
+                logger.info(f"Frame captured: {frame.shape}")
+                
+                # Save latest snapshot (always overwrite)
+                latest_path = os.path.join(config.IMAGES_DIR, config.LATEST_IMAGE_NAME)
+                cv2.imwrite(latest_path, frame, [cv2.IMWRITE_JPEG_QUALITY, 95])
+                logger.info(f"Latest snapshot saved: {latest_path}")
+                
+                # Save timestamped version if requested
+                if save_with_timestamp:
+                    timestamp = datetime.now().strftime(config.TIMESTAMP_FORMAT)
+                    timestamped_filename = f"snapshot_{timestamp}.jpg"
+                    timestamped_path = os.path.join(config.IMAGES_DIR, timestamped_filename)
+                    cv2.imwrite(timestamped_path, frame, [cv2.IMWRITE_JPEG_QUALITY, 95])
+                    logger.info(f"Timestamped snapshot saved: {timestamped_path}")
+                
+                return True, latest_path
+                
+            except Exception as e:
+                logger.error(f"Error during image capture: {e}")
                 return False, None
-            
-            logger.info(f"Frame captured: {frame.shape}")
-            
-            # Save latest snapshot (always overwrite)
-            latest_path = os.path.join(config.IMAGES_DIR, config.LATEST_IMAGE_NAME)
-            cv2.imwrite(latest_path, frame, [cv2.IMWRITE_JPEG_QUALITY, 95])
-            logger.info(f"Latest snapshot saved: {latest_path}")
-            
-            # Save timestamped version if requested
-            if save_with_timestamp:
-                timestamp = datetime.now().strftime(config.TIMESTAMP_FORMAT)
-                timestamped_filename = f"snapshot_{timestamp}.jpg"
-                timestamped_path = os.path.join(config.IMAGES_DIR, timestamped_filename)
-                cv2.imwrite(timestamped_path, frame, [cv2.IMWRITE_JPEG_QUALITY, 95])
-                logger.info(f"Timestamped snapshot saved: {timestamped_path}")
-            
-            return True, latest_path
-            
-        except Exception as e:
-            logger.error(f"Error during image capture: {e}")
-            return False, None
-            
-        finally:
-            # Always release camera
-            self._close_camera()
-            logger.debug("Camera lock released")
+                
+            finally:
+                # Always release camera
+                self._close_camera()
+                logger.debug("Camera lock released")
     
     def test_camera(self) -> bool:
         """
+        Test if camera is accessible and working.
         Thread-safe: uses lock to prevent concurrent camera access.
         
         Returns:
@@ -181,10 +183,12 @@ class CameraCapture:
                 return False
                 
             finally:
-            finally:
-            self._close_camera()
+                self._close_camera()
     
     def generate_frames(self) -> Generator[bytes, None, None]:
+        """
+        Generate video frames for streaming.
+        Yields JPEG encoded frames in Motion JPEG format.
         Thread-safe: uses lock for each frame to allow capture during streaming.
         
         Yields:
@@ -238,10 +242,7 @@ class CameraCapture:
             logger.error(f"Error during video streaming: {e}")
         finally:
             with camera_lock:
-            except Exception as e:
-            logger.error(f"Error during video streaming: {e}")
-        finally:
-            self._close_camera()
+                self._close_camera()
             logger.info(f"Video stream ended. Total frames: {frame_count}")
 
 
