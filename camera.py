@@ -60,6 +60,10 @@ class CameraCapture:
             self.camera.set(cv2.CAP_PROP_FRAME_HEIGHT, config.CAMERA_HEIGHT)
             self.camera.set(cv2.CAP_PROP_FPS, config.CAMERA_FPS)
             
+            # Try to enable auto exposure and auto white balance
+            self.camera.set(cv2.CAP_PROP_AUTO_EXPOSURE, 0.75)  # Auto exposure
+            self.camera.set(cv2.CAP_PROP_AUTOFOCUS, 1)  # Auto focus if available
+            
             # Log actual camera settings
             actual_width = self.camera.get(cv2.CAP_PROP_FRAME_WIDTH)
             actual_height = self.camera.get(cv2.CAP_PROP_FRAME_HEIGHT)
@@ -95,8 +99,16 @@ class CameraCapture:
         
         try:
             # Allow camera to warm up (important for USB cameras)
-            for _ in range(5):
-                self.camera.read()
+            # Some cameras need more warm-up time
+            logger.info("Warming up camera...")
+            for i in range(10):
+                ret, _ = self.camera.read()
+                if i % 3 == 0:
+                    logger.debug(f"Warmup frame {i+1}/10")
+            
+            # Small delay for camera stabilization
+            import time
+            time.sleep(0.5)
             
             # Capture frame
             ret, frame = self.camera.read()
